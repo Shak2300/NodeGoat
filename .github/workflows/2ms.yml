@@ -1,0 +1,49 @@
+name: 2MS - Secrets Detection
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  secrets-scan:
+    name: 2MS - working tree and git history
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # Full history: a secret deleted from a file is still live in earlier commits
+          fetch-depth: 0
+
+      - name: Scan working tree for secrets
+        continue-on-error: true
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/repo" \
+            checkmarx/2ms:latest filesystem --path /repo | tee 2ms-working-tree.txt
+
+      - name: Scan full git history for secrets
+        continue-on-error: true
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/repo" \
+            -e GIT_CONFIG_COUNT=1 \
+            -e GIT_CONFIG_KEY_0=safe.directory \
+            -e GIT_CONFIG_VALUE_0=/repo \
+            checkmarx/2ms:latest git /repo | tee 2ms-history.txt
+
+      - name: Summary
+        run: |
+          echo "### 2MS scan results" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          grep -iE "totalitemsscanned|totalsecretsfound" 2ms-working-tree.txt 2ms-history.txt >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload scan output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: 2ms-output
+          path: |
+            2ms-working-tree.txt
+            2ms-history.txt
+          retention-days: 14
