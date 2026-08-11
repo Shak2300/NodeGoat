@@ -1,0 +1,35 @@
+name: KICS - Infrastructure as Code
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  iac-scan:
+    name: KICS scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run KICS
+        continue-on-error: true
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/path" \
+            checkmarx/kics:latest scan -p /path --no-progress | tee kics-output.txt
+
+      - name: Summary
+        run: |
+          echo "### KICS results" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          sed -n '/Results Summary/,$p' kics-output.txt >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload scan output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kics-output
+          path: kics-output.txt
+          retention-days: 14
