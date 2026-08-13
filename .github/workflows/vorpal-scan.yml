@@ -1,0 +1,39 @@
+name: Checkmarx Vorpal Scan
+
+# Trigger on commits pushed to main, dev, or feature branches
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - 'feature/**'
+
+jobs:
+  vorpal-scan:
+    runs-on: ubuntu-latest
+    steps:
+      # Step 1: Fetch source code
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Step 2: Run Vorpal lightweight scan
+      - name: Vorpal Scan
+        uses: checkmarx/vorpal-reviewdog-github-action@v1.0.0
+        with:
+          # Paths to scan (comma-separated, e.g., 'src/' or '.')
+          source_path: '.'
+          
+          # Built-in GitHub Token (no external secret setup needed)
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          
+          # Reporter mode: use 'github-check' for push commits (or 'github-pr-check' / 'github-pr-review' for PRs)
+          reporter: 'github-check'
+          
+          # Scanning filter mode: 'nofilter' or 'file' scans specified source paths
+          filter_mode: 'file'
+          
+          # Minimum severity level to report [info, warning, error]
+          level: 'error'
+          
+          # Optional: fail the workflow run if security errors are found
+          fail_on_error: true
